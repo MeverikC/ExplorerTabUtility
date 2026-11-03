@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -18,6 +19,7 @@ public partial class MainWindow : Window
     private readonly HookManager _hookManager;
     private readonly ProfileManager _profileManager;
     private readonly SystemTrayIcon _notifyIconManager;
+    private readonly CommandLineBroker _commandLineBroker;
     private nint _handle;
 
     public MainWindow()
@@ -31,6 +33,8 @@ public partial class MainWindow : Window
         _profileManager = new ProfileManager(ProfilesPanel);
         _hookManager = new HookManager(_profileManager);
         _notifyIconManager = new SystemTrayIcon(_profileManager, _hookManager, ShowWindow);
+        _commandLineBroker = new CommandLineBroker(OpenLocationFromCommandLine);
+        _commandLineBroker.Start();
 
         SetupEventHandlers();
         StartHooks();
@@ -241,9 +245,17 @@ public partial class MainWindow : Window
 
     private void OnApplicationExit(object _, ExitEventArgs __)
     {
+        _commandLineBroker.Dispose();
         _notifyIconManager.Dispose();
         _hookManager.Dispose();
     }
+
+    private async Task OpenLocationFromCommandLine(string location)
+    {
+        await await Dispatcher.InvokeAsync(() => _hookManager.OpenLocation(location));
+    }
+
+    public Task OpenLocation(string location) => OpenLocationFromCommandLine(location);
 
     private void TitleBar_MouseLeftButtonDown(object _, MouseButtonEventArgs e)
     {
