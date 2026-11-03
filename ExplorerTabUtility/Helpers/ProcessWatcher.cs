@@ -28,7 +28,7 @@ public class ProcessWatcher : IDisposable
     // Process.Exited is the primary signal. The periodic scan only recovers
     // from missed process events, so it does not need to run at sub-second
     // frequency while the app is idle.
-    private const int DefaultScanIntervalMs = 2_000;
+    private const int DefaultScanIntervalMs = 1_000;
     private readonly string _processName;
     private readonly TimeSpan _scanInterval;
     private readonly SessionFilter _sessionFilter;
