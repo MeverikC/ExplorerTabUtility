@@ -164,6 +164,17 @@ Say goodbye to cluttered desktops with multiple Explorer windows! Explorer Tab U
 
     ![Menu](https://cdn.jsdelivr.net/gh/w4po/ExplorerTabUtility@master/Assets/Menu.png)
 
+### Command-line opening
+
+Pass one or more locations to the executable to open them through the running tray instance:
+
+```powershell
+ExplorerTabUtility.exe "C:\Users\Documents"
+ExplorerTabUtility.exe "C:\Users\Documents" "D:\Projects"
+```
+
+If Explorer Tab Utility is already running, the new process forwards the locations to the existing instance and exits. Each location is opened as a tab, and an already-open matching location is activated instead of duplicated.
+
 ## ⚙️ Configuration
 
 > [!NOTE]
