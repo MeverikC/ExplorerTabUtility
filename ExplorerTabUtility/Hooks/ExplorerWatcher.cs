@@ -277,7 +277,7 @@ public class ExplorerWatcher : IHook
 
         if (!asTab)
         {
-            closedWindow.CreatedAt = Environment.TickCount;
+            closedWindow.CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             await OpenNewWindowWithSelection(closedWindow);
             return;
         }
@@ -549,7 +549,11 @@ public class ExplorerWatcher : IHook
             MessageBoxButton.YesNo,
             MessageBoxImage.Question));
 
-        foreach (var record in _closedWindows.Where(record => record.Restore))
+        WindowRecord[] recordsToRestore;
+        lock (_closedWindowsLock)
+            recordsToRestore = _closedWindows.Where(record => record.Restore).ToArray();
+
+        foreach (var record in recordsToRestore)
         {
             record.Restore = false;
             
@@ -565,8 +569,7 @@ public class ExplorerWatcher : IHook
 
         try
         {
-            lock (_closedWindowsLock)
-                _closedWindows.Add(windowToOpen);
+            AddPendingClosedWindow(windowToOpen);
 
             var hasSelection = windowToOpen.SelectedItems?.Length > 0;
 
@@ -602,11 +605,33 @@ public class ExplorerWatcher : IHook
 
             SelectItems(window, windowToOpen.SelectedItems);
         }
+        catch
+        {
+            RemovePendingClosedWindow(windowToOpen);
+            throw;
+        }
         finally
         {
             if (lockToOpenWindows)
                 _toOpenWindowsLock.Release();
         }
+    }
+    private void AddPendingClosedWindow(WindowRecord record)
+    {
+        lock (_closedWindowsLock)
+            _closedWindows.Add(record);
+
+        _ = Task.Delay(5_000).ContinueWith(
+            _ => RemovePendingClosedWindow(record),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private void RemovePendingClosedWindow(WindowRecord record)
+    {
+        lock (_closedWindowsLock)
+            _closedWindows.RemoveAll(item => ReferenceEquals(item, record));
     }
     private async Task<bool> OpenTabNavigateWithSelection(
         WindowRecord windowToOpen,
@@ -711,12 +736,14 @@ public class ExplorerWatcher : IHook
         try
         {
             targetPidl = _shellPathComparer.GetPidlFromPath(location);
+            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             lock (_closedWindowsLock)
             {
                 for (var i = _closedWindows.Count - 1; i >= 0; i--)
                 {
                     var record = _closedWindows[i];
-                    if (Environment.TickCount - record.CreatedAt > maxAge) break;
+                    var age = now - record.CreatedAt;
+                    if (record.CreatedAt <= 0 || age < 0 || age > maxAge) break;
                     if (!_shellPathComparer.IsEquivalent(location, record.Location, targetPidl)) continue;
                     _closedWindows.RemoveAt(i);
                     closedWindow = record;
